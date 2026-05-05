@@ -48,7 +48,10 @@ export const loginUser = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ message: "All fields are required", success: false });
         }
-        const user = await User.findOne({ email }).select("+password") 
+        const user = await User.findOne({ email })
+        .populate('orders')
+        .populate('bookmarks')
+        .select("+password") 
 
         if (!user) {
             return res.status(400).json({ message: "User does not exist", success: false });
@@ -66,14 +69,7 @@ export const loginUser = async (req, res) => {
 
         res.cookie('token', token, {  httpOnly : true , secure : true });
 
-        return res.status(200).json({ message: "Login successful", success : true , user : {
-            id : user._id,
-            fullName : user.fullName,
-            email : user.email,
-            phoneNo : user.phoneNo,
-            address : user.address,
-            token : token
-        } });
+        return res.status(200).json({ message: "Login successful", success : true , user });
     } catch (error) {
         return res.status(500).json({ message: error.message, success: false });
     }

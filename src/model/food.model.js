@@ -10,8 +10,9 @@ const foodSchema = new mongoose.Schema({
     category : {type : String, required : true} ,
     foodPartner : {type : mongoose.Schema.Types.ObjectId, ref : "FoodPartner"},
     likes : [{type : mongoose.Schema.Types.ObjectId, ref : "User"}],
-    isSaved : {type : Boolean , default : false}
-
+    isLike : {type : Boolean , default : false},
+    isSaved : {type : Boolean , default : false},
+    bookmark : {type : mongoose.Schema.Types.ObjectId , ref : "User"}
 })
 
 const Food = mongoose.model("Food", foodSchema)

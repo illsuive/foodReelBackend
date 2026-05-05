@@ -61,14 +61,18 @@ export const createFood = async (req, res) => {
 
 export const fetchAllFoods = async (req, res) => {
     try {
-        const user = req.user;
-        // _id , fullName , email
-        const foods = await Food.find().populate('foodPartner').select('-password').sort({ createdAt: -1 }) ;
+        const { _id } = req.user;
+        
+        // // _id , fullName , email
+        const foods = await Food.find()
+        .populate('foodPartner')
+        .select('-password')
+        .sort({ createdAt: -1 }) ;
 
         if (!foods) {
             return res.status(404).json({ message: "No foods found", success: false });
         }
-        return res.status(200).json({ message: "Fetched all foods successfully", foods, success: true });
+        return res.status(200).json({ message: "Fetched all foods successfully", foods , success: true });
 
     } catch (error) {
         return res.status(500).json({ message: error.message, success: false });
@@ -221,11 +225,3 @@ export const HandleLikeFood = async (req, res) => {
         return res.status(500).json({ message: error.message, success: false });
     }
 };
-
-export const BookMarkFood = async (req, res) => {
-    try {
-        
-    } catch (error) {
-        return res.status(500).json({ message: error.message, success: false });
-    }
-}

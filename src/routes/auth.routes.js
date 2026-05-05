@@ -11,8 +11,6 @@ router.post('/register' , createUser)
 router.post('/login' , loginUser)
 router.get('/logout' , logoutUser)
 
-
-
 // user ^
 
 router.post('/register-food-partner' , registerFoodPatner)

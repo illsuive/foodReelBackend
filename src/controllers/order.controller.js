@@ -1,46 +1,15 @@
 import RazorpayInstance from '../razorpay/razorPayConfig.js';
 import Order from '../model/foodOrder.js';
+import User from '../model/user.model.js';
+import FoodPartner from '../model/foodPatner.model.js';
 import 'dotenv/config';
 import crypto from 'crypto';
 
-// const formatOrderItems = (order) => {
-//     const groupedByPartner = order.items.reduce((acc, item) => {
-//         const partnerId = item.foodPartner?.toString();
-//         // Since backend structure for items.foodId contains partner info after population
-//         const partnerDetails = item.foodId?.foodPartner;
-
-//         if (!acc[partnerId]) {
-//             acc[partnerId] = {
-//                 foodPartnerId: partnerId,
-//                 restaurantName: partnerDetails?.restaurant || "Restaurant",
-//                 partnerSubtotal: 0,
-//                 items: []
-//             };
-//         }
-
-//         acc[partnerId].items.push(item);
-//         acc[partnerId].partnerSubtotal += item.price * item.quantity;
-//         return acc;
-//     }, {});
-
-//     return {
-//         _id: order._id,
-//         totalAmount: order.totalPrice,
-//         shipping: order.shipping,
-//         status: order.status,
-//         createdAt: order.createdAt,
-//         razorPay_order_id: order.razorPay_order_id,
-//         groupedItems: Object.values(groupedByPartner)
-//     };
-// };
-
 const formatOrderItems = (order) => {
     const groupedByPartner = order.items.reduce((acc, item) => {
-        // Use the foodPartner ID directly from the item as defined in your schema
         const partnerId = item.foodPartner?.toString();
-        
-        // Access restaurant name from the populated foodId path
-        const partnerDetails = item.foodId?.foodPartner;
+        const foodData = item.foodId; 
+        const partnerDetails = foodData?.foodPartner;
 
         if (!acc[partnerId]) {
             acc[partnerId] = {
@@ -51,14 +20,19 @@ const formatOrderItems = (order) => {
             };
         }
 
-        acc[partnerId].items.push(item);
+        acc[partnerId].items.push({
+            ...item._doc, 
+            video: foodData?.video, 
+            description: foodData?.description 
+        });
+
         acc[partnerId].partnerSubtotal += item.price * item.quantity;
         return acc;
     }, {});
 
     return {
         _id: order._id,
-        totalAmount: order.totalPrice, // Maps totalPrice to totalAmount for frontend consistency
+        totalAmount: order.totalPrice,
         shipping: order.shipping,
         status: order.status,
         createdAt: order.createdAt,
@@ -138,9 +112,22 @@ export const VerifyPayment = async (req, res) => {
                 return res.status(404).json({ success: false, message: "Order not found" });
             }
 
+            const user = await User.findById(updatedOrder.user);
+            if (user) {
+                user.orders.push(updatedOrder._id);
+                await user.save();
+            }
+
+            const partnerIds = [...new Set(updatedOrder.items.map(item => item.foodPartner.toString()))];
+
+            await FoodPartner.updateMany(
+                { _id: { $in: partnerIds } },
+                { $addToSet: { customers: updatedOrder.user } }
+            );
+            
             return res.status(200).json({ 
                 success: true, 
-                message: "Payment verified successfully", 
+                message: "Payment verified and Partners updated", 
                 order: updatedOrder 
             });
         } else {
@@ -150,21 +137,23 @@ export const VerifyPayment = async (req, res) => {
         console.error("Verification Error:", error);
         res.status(500).json({ success: false, message: "Error verifying payment", error: error.message });
     }
-};
-
+}
 
 export const GetOrders = async (req, res) => {
     try {
-        const { _id } = req.user;
-        const rawOrders = await Order.find({ user : _id }).populate({path: 'items.foodId',populate: { path: 'foodPartner' }})
+        const { _id } = req.user;  
+        
+        const rawOrders = await Order.find({ user: _id })
+            .populate({
+                path: 'items.foodId', 
+                populate: { path: 'foodPartner' } 
+            })
             .sort({ createdAt: -1 });
-       console.log(rawOrders);
-       
+    
         if (!rawOrders || rawOrders.length === 0) {
-            return res.status(404).json({ message: "No orders found", success: false });
+            return res.status(200).json({ message: "No orders found", orders: [], success: true });
         }
 
-        // Apply grouping format to every order in the list
         const formattedOrders = rawOrders.map(order => formatOrderItems(order));
         
         return res.status(200).json({ 
@@ -177,23 +166,47 @@ export const GetOrders = async (req, res) => {
     }
 }
 
+export const getOrderByUser = async (req, res) => {
+    try {
+        const { _id } = req.user;
+        const user = await User.findById(_id).populate('orders')
+        .populate({
+            path: 'orders.items.foodId',
+            populate: { path: 'foodPartner' }
+        })
+        .sort({ createdAt: -1 });
+        if (!user) {
+            return res.status(404).json({ message: "User not found", success: false });
+        }
+        const orders = user.orders.map(order => formatOrderItems(order));
+        return res.status(200).json({ message: "User orders fetched successfully", orders, success: true });
+    } catch (error) {
+        return res.status(500).json({ message: error.message, success: false });
+    }
+}
+
 export const getOrderBypatner = async (req, res) => {
     try {
-        const { id } = req.params; // The ID of the food partner
+        const { id } = req.params; 
         const foodPartner = req.foodPartner;
-        
+       
         if (!foodPartner) {
             return res.status(401).json({ message: "Log in first to get access", success: false });
         }   
 
-        // 1. Find orders that contain at least one item from this partner
-        const rawOrders = await Order.find({ "items.foodPartner": id })
-            .populate('items.foodId')
-            .populate('user', 'fullName email') 
+       const rawOrders = await Order.find({ "items.foodPartner": id })
+            .populate({
+                path: 'items.foodId',
+                populate: { path: 'foodPartner' }
+            })
             .sort({ createdAt: -1 });
-
+    
         if (!rawOrders || rawOrders.length === 0) {
-            return res.status(404).json({ message: "No orders found", success: false });
+            return res.status(200).json({ 
+                message: "No orders found", 
+                orders: [], 
+                success: true 
+            });
         }
 
         // 2. Filter the items within each order to show ONLY this partner's items
@@ -231,3 +244,5 @@ export const getOrderBypatner = async (req, res) => {
         return res.status(500).json({ message: error.message, success: false });
     }
 }
+
+// work here
