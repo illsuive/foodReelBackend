@@ -61,7 +61,7 @@ export const createFood = async (req, res) => {
 
 export const fetchAllFoods = async (req, res) => {
     try {
-        const { _id } = req.user;
+        
         
         // // _id , fullName , email
         const foods = await Food.find()

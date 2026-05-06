@@ -12,6 +12,7 @@ app.use(cors({
   origin : process.env.FRONT_URL,
   credentials : true,
   methods : ['GET' , 'POST' , 'PUT' , 'DELETE' , 'OPTIONS'],
+  exposedHeaders : ['Authorization'],
 }))
 app.use(cookieParser())
 app.use(express.json())
@@ -27,5 +28,3 @@ app.use('/cart' , cartRouter)
 app.use('/order' , orderRouter)
 
 export default app
-
-//work on create food 
