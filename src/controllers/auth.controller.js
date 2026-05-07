@@ -13,10 +13,10 @@ export const createUser = async (req, res) => {
         if (!fullName || !email || !password) {
             return res.status(400).json({ message: "All fields are required", success: false });
         }
-        
+
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: "User already exists" , success : false});
+            return res.status(400).json({ message: "User already exists", success: false });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,16 +27,23 @@ export const createUser = async (req, res) => {
             expiresIn: "1h",
         });
 
-        res.cookie("token", token);
-        
+        res.cookie("token", token, {
+            httpOnly: true,           // Prevents XSS attacks
+            secure: true,             // REQUIRED for cross-site cookies (HTTPS)
+            sameSite: "none",         // REQUIRED for cross-site cookies
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         await user.save();
 
-        return res.status(201).json({ message: "User created successfully", success : true , user : {
-            id : user._id,
-            fullName : user.fullName,
-            email : user.email,
-            token : token
-        } });
+        return res.status(201).json({
+            message: "User created successfully", success: true, user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                token: token
+            }
+        });
     } catch (error) {
         return res.status(500).json({ message: error.message, success: false });
     }
@@ -49,9 +56,9 @@ export const loginUser = async (req, res) => {
             return res.status(400).json({ message: "All fields are required", success: false });
         }
         const user = await User.findOne({ email })
-        .populate('orders')
-        .populate('bookmarks')
-        .select("+password") 
+            .populate('orders')
+            .populate('bookmarks')
+            .select("+password")
 
         if (!user) {
             return res.status(400).json({ message: "User does not exist", success: false });
@@ -67,9 +74,15 @@ export const loginUser = async (req, res) => {
             expiresIn: "1h",
         });
 
-        res.cookie('token', token);
+        res.cookie("token", token, {
+            httpOnly: true,           // Prevents XSS attacks
+            secure: true,             // REQUIRED for cross-site cookies (HTTPS)
+            sameSite: "none",         // REQUIRED for cross-site cookies
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
 
-        return res.status(200).json({ message: "Login successful", success : true , user });
+        
+        return res.status(200).json({ message: "Login successful", success: true, user });
     } catch (error) {
         return res.status(500).json({ message: error.message, success: false });
     }
@@ -77,10 +90,17 @@ export const loginUser = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
     try {
-        res.clearCookie("token");
-        return res.status(200).json({ message: "Logout successful" });
+        return res.cookie("token", "", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            expires: new Date(0)
+        }).status(200).json({
+            message: "Logout successful",
+            success: true
+        });
     } catch (error) {
-        return res.status(500).json({ message: error.message , success : false});
+        return res.status(500).json({ message: error.message, success: false });
     }
 }
 
@@ -88,13 +108,13 @@ export const fetchUserById = async (req, res) => {
     try {
         const { id } = req.params;
         const user = await User.findById(id);
-        
+
         if (!user) {
             return res.status(404).json({ message: "User not found", success: false });
         }
         return res.status(200).json({ message: "User found", success: true, user });
     } catch (error) {
-        return res.status(500).json({ message: error.message , success : false});
+        return res.status(500).json({ message: error.message, success: false });
     }
 
 }
@@ -103,7 +123,7 @@ export const fetchUserById = async (req, res) => {
 
 export const registerFoodPatner = async (req, res) => {
     try {
-        const { fullName, email, password , phoneNo , address , restaurant} = req.body;
+        const { fullName, email, password, phoneNo, address, restaurant } = req.body;
         if (!fullName || !email || !password || !phoneNo || !address || !restaurant) {
             return res.status(400).json({ message: "All fields are required", success: false });
         }
@@ -116,28 +136,35 @@ export const registerFoodPatner = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser = await FoodPartner.create({ fullName, email, password: hashedPassword , phoneNo , address , restaurant});
+        const newUser = await FoodPartner.create({ fullName, email, password: hashedPassword, phoneNo, address, restaurant });
 
         const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
             expiresIn: "1h",
         });
 
-        res.cookie("token", token);
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 24 * 60 * 60 * 1000
+        });
 
         await newUser.save();
 
-        return res.status(201).json({ message: "Food Partner registered successfully", success: true, user: {
-            id: newUser._id,
-            fullName: newUser.fullName,
-            email: newUser.email,
-            phoneNo: newUser.phoneNo,
-            address: newUser.address,
-            restaurant: newUser.restaurant,
-            token: token
-        } });
+        return res.status(201).json({
+            message: "Food Partner registered successfully", success: true, user: {
+                id: newUser._id,
+                fullName: newUser.fullName,
+                email: newUser.email,
+                phoneNo: newUser.phoneNo,
+                address: newUser.address,
+                restaurant: newUser.restaurant,
+                token: token
+            }
+        });
 
     } catch (error) {
-        return res.status(500).json({ message: error.message , success : false});
+        return res.status(500).json({ message: error.message, success: false });
     }
 }
 
@@ -149,7 +176,7 @@ export const loginFoodPartner = async (req, res) => {
         }
 
         let foodPartner = await FoodPartner.findOne({ email })
-            .select("+password") 
+            .select("+password")
             .populate('totalMeals');
 
         if (!foodPartner) {
@@ -169,17 +196,17 @@ export const loginFoodPartner = async (req, res) => {
         const partnerData = foodPartner.toObject();
         delete partnerData.password;
 
-        res.cookie("token", token, { 
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === "production", 
-            sameSite: "strict",
-            maxAge: 24 * 60 * 60 * 1000 
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 24 * 60 * 60 * 1000
         });
 
-        return res.status(200).json({ 
-            message: "Login successful", 
-            success: true, 
-            user: partnerData 
+        return res.status(200).json({
+            message: "Login successful",
+            success: true,
+            user: partnerData
         });
     } catch (error) {
         return res.status(500).json({ message: error.message, success: false });
@@ -188,10 +215,17 @@ export const loginFoodPartner = async (req, res) => {
 
 export const logoutFoodPartner = async (req, res) => {
     try {
-        res.clearCookie("token");
-        return res.status(200).json({ message: "Logout successful", success: true });
+        return res.cookie("token", "", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            expires: new Date(0)
+        }).status(200).json({
+            message: "Logout successful",
+            success: true
+        });
     } catch (error) {
-        return res.status(500).json({ message: error.message , success : false});
+        return res.status(500).json({ message: error.message, success: false });
     }
 }
 
@@ -204,7 +238,7 @@ export const fetchPatnerByid = async (req, res) => {
         }
         return res.status(200).json({ message: "Food Partner fetched successfully", foodPartner, success: true });
     } catch (error) {
-        return res.status(500).json({ message: error.message , success : false});
+        return res.status(500).json({ message: error.message, success: false });
     }
 }
 // food partner ^
