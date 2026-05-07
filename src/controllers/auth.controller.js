@@ -27,7 +27,7 @@ export const createUser = async (req, res) => {
             expiresIn: "1h",
         });
 
-        res.cookie("token", token, {  httpOnly : true , secure : true });
+        res.cookie("token", token);
         
         await user.save();
 
@@ -67,7 +67,7 @@ export const loginUser = async (req, res) => {
             expiresIn: "1h",
         });
 
-        res.cookie('token', token, {  httpOnly : true , secure : true });
+        res.cookie('token', token);
 
         return res.status(200).json({ message: "Login successful", success : true , user });
     } catch (error) {
@@ -122,7 +122,7 @@ export const registerFoodPatner = async (req, res) => {
             expiresIn: "1h",
         });
 
-        res.cookie("token", token, {  httpOnly : true , secure : true });
+        res.cookie("token", token);
 
         await newUser.save();
 
